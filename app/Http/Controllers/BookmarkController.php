@@ -39,4 +39,31 @@ class BookmarkController extends Controller
 
         return $response;
     }
+
+    public function sendVerifyEmail(Request $request)
+    {
+        $recentAttempt = EmailVerification::whereUserId(Auth::id())
+        ->whereDate('created_at', '>', now()->subHours(12))->count();
+
+        if ($recentAttempt > 0) {
+            return redirect()->back()->with('error', 'A verification email has already been sent recently. Please check your email, or try again later.');
+        } 
+
+        EmailVerification::whereUserId(Auth::id())->delete();
+
+        $user = User::whereNull('email_verified_at')->find(Auth::id());
+        $utoken = str_random(64);
+        $rtoken = str_random(128);
+
+        $verify = new EmailVerification();
+        $verify->user_id = $user->id;
+        $verify->email = $user->email;
+        $verify->user_token = $utoken;
+        $verify->random_token = $rtoken;
+        $verify->save();
+
+        Mail::to($user->email)->send(new ConfirmEmail($verify));
+
+        return redirect()->back()->with('status', 'Verification email sent!');
+    }
 }
